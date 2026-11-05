@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl   # fully static binary
+            artifact: helmsniff-ng-linux-amd64.tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: helmsniff-ng-windows-amd64.zip
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: helmsniff-ng-macos-arm64.zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      # --- Linux ---
+      - name: Package Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/helmsniff-ng helmsniff-ng
+          tar czf ${{ matrix.artifact }} helmsniff-ng README.md LICENSE
+
+      # --- Windows ---
+      - name: Package Windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Copy-Item target/${{ matrix.target }}/release/helmsniff-ng.exe helmsniff-ng.exe
+          Compress-Archive -Path helmsniff-ng.exe, README.md, LICENSE -DestinationPath ${{ matrix.artifact }}
+
+      # --- macOS ---
+      - name: Package macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/helmsniff-ng helmsniff-ng
+          zip -r ${{ matrix.artifact }} helmsniff-ng README.md LICENSE
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            helmsniff-ng-linux-amd64.tar.gz/*.tar.gz
+            helmsniff-ng-windows-amd64.zip/*.zip
+            helmsniff-ng-macos-arm64.zip/*.zip

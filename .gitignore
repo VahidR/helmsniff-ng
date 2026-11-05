@@ -1,0 +1,21 @@
+/target
+
+# Binaries
+bin/
+dist/
+
+# Output
+result.csv
+
+# IDE/editor files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
